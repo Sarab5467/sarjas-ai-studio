@@ -53,4 +53,5 @@ def handler(job):
         }
     raise ValueError(f"Unsupported action: {action}")
 
-runpod.serverless.start({"handler": handler})
+if __name__ == "__main__":
+    runpod.serverless.start({"handler": handler})
