@@ -11,7 +11,7 @@ handler.db_init(); c=TestClient(handler.app); H={"Authorization":"Bearer test-se
 
 def test_health(): assert c.get("/health").json()["model_present"] is True
 def test_auth_rejected(): assert c.get("/v1/jobs/nope").status_code==401
-def test_bad_prompt(): assert c.post("/v1/jobs",headers=H,json={"prompt":""}).status_code==500 or c.post("/v1/jobs",headers=H,json={"prompt":""}).status_code==400
+def test_bad_prompt(): assert c.post("/v1/jobs",headers=H,json={"prompt":""}).status_code==400
 def test_persistent_db_roundtrip():
     handler.db_put("abc","QUEUED",request={"prompt":"x"});handler.db_put("abc","RUNNING")
     assert handler.db_get("abc")["status"]=="RUNNING"
