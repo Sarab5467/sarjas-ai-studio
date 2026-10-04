@@ -80,7 +80,6 @@ class RunpodLifecycle:
             "--ports",f"{self.cfg.port}/http",
             "--env",env_json,
             "--docker-args",launch,
-            "--stop-after",self.cfg.stop_after,
             timeout=180,
         )
         m = re.search(r"(?:pod\s*id|id)\s*[:=]?\s*([a-zA-Z0-9_-]{8,})", out, re.I)
