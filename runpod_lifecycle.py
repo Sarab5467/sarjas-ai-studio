@@ -47,27 +47,17 @@ class RunpodLifecycle:
     def endpoint(pod_id: str, port: int = 8000) -> str:
         return f"https://{pod_id}-{port}.proxy.runpod.net"
 
-    def create(self, approval: str, bootstrap_path: str, handler_path: str) -> str:
+    def create(self, approval: str, bootstrap_path: str = "", handler_path: str = "") -> str:
         if approval.strip() != APPROVAL_TEXT:
             raise PermissionError("Explicit spending approval is required before starting paid GPU compute")
-        boot = pathlib.Path(bootstrap_path).read_bytes()
-        handler = pathlib.Path(handler_path).read_bytes()
-        # Payloads are passed as environment values; bootstrap writes them into
-        # the persistent network volume before launching the backend.
         env_json = json.dumps({
             "SARJAS_API_TOKEN": self.cfg.api_token,
             "SARJAS_ROOT": "/workspace/sarjas",
             "SARJAS_WAN_MODEL": "/workspace/sarjas/models/Wan2.1-T2V-1.3B",
-            "SARJAS_BOOTSTRAP_B64": base64.b64encode(boot).decode(),
-            "SARJAS_HANDLER_B64": base64.b64encode(handler).decode(),
+            "SARJAS_MODE": "pod",
+            "PORT": str(self.cfg.port),
         }, separators=(",", ":"))
-        launch = (
-            "bash -lc 'mkdir -p /workspace/sarjas/runtime; "
-            "echo \"$SARJAS_BOOTSTRAP_B64\" | base64 -d > /workspace/sarjas/runtime/bootstrap.sh; "
-            "echo \"$SARJAS_HANDLER_B64\" | base64 -d > /workspace/sarjas/runtime/handler.py; "
-            "chmod +x /workspace/sarjas/runtime/bootstrap.sh; "
-            "exec /workspace/sarjas/runtime/bootstrap.sh'"
-        )
+        launch = "bash /workspace/sarjas/runtime/bootstrap.sh"
         out = self._run(
             "pod","create","--name",self.cfg.name,
             "--image",self.cfg.image,
@@ -82,9 +72,7 @@ class RunpodLifecycle:
             "--stop-after",self.cfg.stop_after,
             timeout=180,
         )
-        ids = re.findall(r"\b[a-zA-Z0-9_-]{8,}\b", out)
-        # Prefer a token shown after an id/pod label; otherwise fail closed.
-        m = re.search(r"(?:pod\s*id|id)\s*[:=]?\s*([a-zA-Z0-9_-]{8,})", out, re.I)
+        m = re.search(r"(?:pod\\s*id|id)\\s*[:=]?\\s*([a-zA-Z0-9_-]{8,})", out, re.I)
         if m:
             return m.group(1)
         raise RuntimeError("Pod created but SarJas could not safely parse Pod ID; output: "+out[:500])
