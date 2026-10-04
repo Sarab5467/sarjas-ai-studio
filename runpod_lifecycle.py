@@ -57,16 +57,23 @@ class RunpodLifecycle:
             "SARJAS_MODE": "pod",
             "PORT": str(self.cfg.port),
         }, separators=(",", ":"))
-        # First-boot bootstrap: the persistent volume may contain only models.
-        # Seed bootstrap + backend directly from the trusted SarJas GitHub branch
-        # before executing them. This removes the chicken-and-egg dependency on
-        # runtime files already existing on /workspace.
-        ref = os.getenv("SARJAS_BOOTSTRAP_REF", "main")
-        base = f"https://raw.githubusercontent.com/Sarab5467/sarjas-ai-studio/{ref}"
+        # First boot must not depend on unauthenticated raw GitHub: this repo is private.
+        # Seed the two small runtime files from the trusted local checkout.
+        repo_root = pathlib.Path(__file__).resolve().parent
+        bpath = pathlib.Path(bootstrap_path) if bootstrap_path else repo_root / "runtime" / "bootstrap.sh"
+        hpath = pathlib.Path(handler_path) if handler_path else repo_root / "handler.py"
+        if not bpath.is_file() or not hpath.is_file():
+            raise FileNotFoundError("SarJas bootstrap payload is missing; refusing to create paid compute")
+        bootstrap_b64 = base64.b64encode(bpath.read_bytes()).decode("ascii")
+        handler_b64 = base64.b64encode(hpath.read_bytes()).decode("ascii")
+        env = json.loads(env_json)
+        env["SARJAS_BOOTSTRAP_B64"] = bootstrap_b64
+        env["SARJAS_HANDLER_B64"] = handler_b64
+        env_json = json.dumps(env, separators=(",", ":"))
         launch = (
             "set -e; mkdir -p /workspace/sarjas/runtime; "
-            f"curl -fsSL {base}/runtime/bootstrap.sh -o /workspace/sarjas/runtime/bootstrap.sh; "
-            f"curl -fsSL {base}/handler.py -o /workspace/sarjas/runtime/handler.py; "
+            "printf %s \"$SARJAS_BOOTSTRAP_B64\" | base64 -d > /workspace/sarjas/runtime/bootstrap.sh; "
+            "printf %s \"$SARJAS_HANDLER_B64\" | base64 -d > /workspace/sarjas/runtime/handler.py; "
             "exec bash /workspace/sarjas/runtime/bootstrap.sh"
         )
         out = self._run(
