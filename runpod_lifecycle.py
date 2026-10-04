@@ -5,7 +5,7 @@ This adapter uses the official runpodctl Pod lifecycle surface so API details
 remain owned by Runpod rather than duplicated in SarJas.
 """
 from __future__ import annotations
-import base64, json, os, pathlib, re, shutil, subprocess, time
+import base64, json, os, pathlib, re, shutil, subprocess, time, urllib.request
 from dataclasses import dataclass
 import requests
 
@@ -57,7 +57,18 @@ class RunpodLifecycle:
             "SARJAS_MODE": "pod",
             "PORT": str(self.cfg.port),
         }, separators=(",", ":"))
-        launch = "bash /workspace/sarjas/runtime/bootstrap.sh"
+        # First-boot bootstrap: the persistent volume may contain only models.
+        # Seed bootstrap + backend directly from the trusted SarJas GitHub branch
+        # before executing them. This removes the chicken-and-egg dependency on
+        # runtime files already existing on /workspace.
+        ref = os.getenv("SARJAS_BOOTSTRAP_REF", "main")
+        base = f"https://raw.githubusercontent.com/Sarab5467/sarjas-ai-studio/{ref}"
+        launch = (
+            "set -e; mkdir -p /workspace/sarjas/runtime; "
+            f"curl -fsSL {base}/runtime/bootstrap.sh -o /workspace/sarjas/runtime/bootstrap.sh; "
+            f"curl -fsSL {base}/handler.py -o /workspace/sarjas/runtime/handler.py; "
+            "exec bash /workspace/sarjas/runtime/bootstrap.sh"
+        )
         out = self._run(
             "pod","create","--name",self.cfg.name,
             "--image",self.cfg.image,
