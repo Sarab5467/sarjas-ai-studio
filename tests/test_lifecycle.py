@@ -22,3 +22,28 @@ def test_start_requires_approval():
     x=RunpodLifecycle(PodConfig(network_volume_id="vol",api_token="secret"),runpodctl="runpodctl")
     with pytest.raises(PermissionError):
         x.start("pod12345","")
+
+
+def test_create_builds_persistent_bootstrap_command(tmp_path, monkeypatch):
+    x=RunpodLifecycle(PodConfig(network_volume_id="vol123",api_token="secret"),runpodctl="runpodctl")
+    seen={}
+    def fake_run(*args,**kwargs):
+        seen["args"]=args
+        return "Pod ID: abcdefgh1234"
+    monkeypatch.setattr(x,"_run",fake_run)
+    assert x.create(APPROVAL_TEXT)== "abcdefgh1234"
+    args=seen["args"]
+    assert "--network-volume-id" in args
+    assert "vol123" in args
+    assert "--volume-mount-path" in args
+    assert "/workspace" in args
+    assert "--ports" in args
+    assert "8000/http" in args
+    assert "--stop-after" in args
+    assert "bash /workspace/sarjas/runtime/bootstrap.sh" in args
+    joined=" ".join(args)
+    assert "BOOTSTRAP_B64" not in joined
+    assert "HANDLER_B64" not in joined
+
+def test_endpoint_uses_dynamic_pod_id():
+    assert RunpodLifecycle.endpoint("freshpod999",8000)=="https://freshpod999-8000.proxy.runpod.net"
