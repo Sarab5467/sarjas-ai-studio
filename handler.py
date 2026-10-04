@@ -94,7 +94,11 @@ def http_health():return health()
 
 @app.post("/v1/jobs")
 def submit(req:JobRequest,authorization:str|None=Header(default=None)):
-    auth(authorization);p=req.model_dump();validate(p);jid=str(uuid.uuid4());db_put(jid,"QUEUED",request=p)
+    auth(authorization);p=req.model_dump()
+    try: validate(p)
+    except ValueError as e: raise HTTPException(400,str(e))
+    except RuntimeError as e: raise HTTPException(503,str(e))
+    jid=str(uuid.uuid4());db_put(jid,"QUEUED",request=p)
     def work():
         db_put(jid,"RUNNING")
         try: db_put(jid,"COMPLETED",result=generate(p,jid))
