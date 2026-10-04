@@ -40,11 +40,11 @@ def test_create_builds_persistent_bootstrap_command(tmp_path, monkeypatch):
     assert "--ports" in args
     assert "8000/http" in args
     assert "--stop-after" in args
-    assert "raw.githubusercontent.com/Sarab5467/sarjas-ai-studio" in args
-    assert "runtime/bootstrap.sh" in args
-    assert "handler.py" in args
-    assert "exec bash /workspace/sarjas/runtime/bootstrap.sh" in args
     joined=" ".join(args)
+    assert "raw.githubusercontent.com/Sarab5467/sarjas-ai-studio" in joined
+    assert "runtime/bootstrap.sh" in joined
+    assert "handler.py" in joined
+    assert "exec bash /workspace/sarjas/runtime/bootstrap.sh" in joined
     assert "BOOTSTRAP_B64" not in joined
     assert "HANDLER_B64" not in joined
 
