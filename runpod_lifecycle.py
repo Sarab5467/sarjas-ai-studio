@@ -83,7 +83,7 @@ class RunpodLifecycle:
             "--stop-after",self.cfg.stop_after,
             timeout=180,
         )
-        m = re.search(r"(?:pod\\s*id|id)\\s*[:=]?\\s*([a-zA-Z0-9_-]{8,})", out, re.I)
+        m = re.search(r"(?:pod\s*id|id)\s*[:=]?\s*([a-zA-Z0-9_-]{8,})", out, re.I)
         if m:
             return m.group(1)
         raise RuntimeError("Pod created but SarJas could not safely parse Pod ID; output: "+out[:500])
