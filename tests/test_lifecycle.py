@@ -40,12 +40,11 @@ def test_create_builds_persistent_bootstrap_command(tmp_path, monkeypatch):
     assert "--ports" in args
     assert "8000/http" in args
     joined=" ".join(args)
-    assert "raw.githubusercontent.com/Sarab5467/sarjas-ai-studio" in joined
-    assert "runtime/bootstrap.sh" in joined
-    assert "handler.py" in joined
+    assert "raw.githubusercontent.com" not in joined
     assert "exec bash /workspace/sarjas/runtime/bootstrap.sh" in joined
-    assert "BOOTSTRAP_B64" not in joined
-    assert "HANDLER_B64" not in joined
+    env_arg=args[args.index("--env")+1]
+    assert "SARJAS_BOOTSTRAP_B64" in env_arg
+    assert "SARJAS_HANDLER_B64" in env_arg
 
 def test_endpoint_uses_dynamic_pod_id():
     assert RunpodLifecycle.endpoint("freshpod999",8000)=="https://freshpod999-8000.proxy.runpod.net"
