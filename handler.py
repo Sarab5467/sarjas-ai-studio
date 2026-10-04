@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import runpod
+
 
 VERSION="25.5"
 ROOT=pathlib.Path(os.getenv("SARJAS_ROOT","/workspace/sarjas"))
@@ -125,4 +125,9 @@ if __name__=="__main__":
     db_init()
     if MODE=="pod":
         import uvicorn;uvicorn.run(app,host="0.0.0.0",port=int(os.getenv("PORT","8000")))
-    else:runpod.serverless.start({"handler":serverless_handler})
+    else:
+        try:
+            import runpod
+        except ImportError as e:
+            raise RuntimeError("runpod package is required only for serverless mode; use SARJAS_MODE=pod for regular GPU Pods") from e
+        runpod.serverless.start({"handler":serverless_handler})
