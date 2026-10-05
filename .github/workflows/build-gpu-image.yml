@@ -6,6 +6,7 @@ on:
     paths:
       - Dockerfile
       - handler.py
+      - entrypoint.sh
       - requirements-serverless.txt
       - .github/workflows/build-gpu-image.yml
 permissions:
