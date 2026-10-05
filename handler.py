@@ -47,10 +47,32 @@ def db_get(jid):
     return x
 
 def health():
-    return {"ok":True,"service":"sarjas-ai-studio","version":VERSION,"mode":MODE,
+    critical=[
+      MODEL/"diffusion_pytorch_model.safetensors",
+      MODEL/"models_t5_umt5-xxl-enc-bf16.pth",
+      MODEL/"Wan2.1_VAE.pth",
+      MODEL/"config.json",
+    ]
+    model_present=all(p.is_file() for p in critical)
+    cuda_ready=False; gpu_name=None; flash_ready=False
+    try:
+        import torch
+        cuda_ready=bool(torch.cuda.is_available())
+        if cuda_ready: gpu_name=torch.cuda.get_device_name(0)
+    except Exception:
+        pass
+    try:
+        import flash_attn
+        flash_ready=True
+    except Exception:
+        pass
+    wan_present=(WAN_REPO/"generate.py").is_file()
+    ready=model_present and wan_present and cuda_ready and flash_ready
+    return {"ok":ready,"service":"sarjas-ai-studio","version":VERSION,"mode":MODE,
       "storage_root":str(ROOT),"storage_mounted":ROOT.exists(),"db_path":str(DB),
-      "model_path":str(MODEL),"model_present":MODEL.exists(),
-      "wan_repo":str(WAN_REPO),"wan_present":(WAN_REPO/"generate.py").exists()}
+      "model_path":str(MODEL),"model_present":model_present,
+      "wan_repo":str(WAN_REPO),"wan_present":wan_present,
+      "cuda_ready":cuda_ready,"gpu_name":gpu_name,"flash_attn_ready":flash_ready}
 
 def validate(p):
     action=str(p.get("action","health"))
