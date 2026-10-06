@@ -24,10 +24,12 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel packagin
 
 COPY handler.py /app/handler.py
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod 0755 /app/entrypoint.sh
 
 EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=4 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"
 
-CMD ["/app/entrypoint.sh"]
+# RunPod's base image supplies its own startup ENTRYPOINT. Override it so the
+# SarJas worker is PID 1 and cannot be bypassed by base-image startup logic.
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]
