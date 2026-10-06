@@ -137,3 +137,45 @@ class RunpodLifecycle:
                 last = str(exc)
             time.sleep(poll)
         raise TimeoutError("Backend did not become ready: " + last)
+
+def start_for_g(explicit_approval: bool = False, estimated_usd: float = 0.0) -> dict:
+    """One-command G startup gate used by the Windows SarJas app."""
+    if not explicit_approval:
+        raise PermissionError("Explicit spending approval is required before G")
+    if estimated_usd <= 0 or estimated_usd > 0.25:
+        raise PermissionError("G estimate must be greater than $0 and no more than the approved $0.25")
+
+    api_token = os.getenv("SARJAS_WORKER_TOKEN") or os.getenv("SARJAS_API_TOKEN")
+    hf_token = os.getenv("HF_TOKEN")
+    hf_repo = os.getenv("HF_MODEL_REPO", "SarabBagyana/sarjas-wan-runtime")
+    if not api_token or not hf_token:
+        raise RuntimeError("SARJAS_WORKER_TOKEN/SARJAS_API_TOKEN and HF_TOKEN must be set")
+
+    lifecycle = RunpodLifecycle(PodConfig(
+        api_token=api_token,
+        hf_token=hf_token,
+        hf_model_repo=hf_repo,
+    ))
+    pod_id = ""
+    try:
+        pod_id = lifecycle.create(APPROVAL_TEXT)
+        print(f"[SARJAS] Pod created: {pod_id}", flush=True)
+        print("[SARJAS] Waiting for custom worker image and backend...", flush=True)
+        health = lifecycle.wait_ready(pod_id)
+        print("[SARJAS] G READY", flush=True)
+        return {
+            "ok": True,
+            "pod_id": pod_id,
+            "endpoint": lifecycle.endpoint(pod_id, lifecycle.cfg.port),
+            "health": health,
+            "estimated_usd": estimated_usd,
+        }
+    except Exception:
+        if pod_id:
+            print("[SARJAS] Startup failed. Stopping GPU...", flush=True)
+            try:
+                lifecycle.stop(pod_id)
+            except Exception as stop_error:
+                print(f"[SARJAS] WARNING: automatic stop failed: {stop_error}", flush=True)
+        raise
+
