@@ -45,6 +45,7 @@ class PodConfig:
     container_disk_gb: int = 80
     port: int = 8000
     name: str = "sarjas-ai-25-5"
+    network_volume_id: str = ""
 
 class RunpodLifecycle:
     def __init__(self, cfg: PodConfig, runpodctl: str | None = None):
@@ -53,6 +54,7 @@ class RunpodLifecycle:
         if not self.exe: raise RuntimeError("runpodctl is not installed/configured")
         if not cfg.api_token: raise ValueError("SarJas backend token is required")
         if not cfg.hf_token: raise ValueError("Hugging Face runtime token is required")
+        if not cfg.network_volume_id: raise ValueError("Persistent RunPod network volume is required")
 
     def _run(self, *args: str, timeout: int = 120) -> str:
         p = subprocess.run([self.exe, *args], text=True, capture_output=True,
@@ -86,10 +88,12 @@ class RunpodLifecycle:
             "SARJAS_API_TOKEN": self.cfg.api_token, "HF_TOKEN": self.cfg.hf_token,
             "HF_MODEL_REPO": self.cfg.hf_model_repo, "SARJAS_ROOT": "/workspace/sarjas",
             "SARJAS_WAN_MODEL": "/workspace/sarjas/models/Wan2.1-T2V-1.3B",
-            "SARJAS_MODE": "pod", "PORT": str(self.cfg.port)}, separators=(",", ":"))
+            "SARJAS_MODE": "pod", "PORT": str(self.cfg.port),
+            "SARJAS_REQUIRE_PERSISTENT_MODEL": "1"}, separators=(",", ":"))
         out = self._run("pod","create","--name",self.cfg.name,"--image",self.cfg.image,
                         "--gpu-id",self.cfg.gpu_id,"--gpu-count","1",
                         "--container-disk-in-gb",str(self.cfg.container_disk_gb),
+                        "--network-volume-id",self.cfg.network_volume_id,
                         "--volume-mount-path","/workspace","--ports",f"{self.cfg.port}/http",
                         "--env",env_json,timeout=180)
         return self._parse_pod_id(out)
@@ -104,6 +108,8 @@ class RunpodLifecycle:
                 r=requests.get(url+"/health",timeout=10)
                 if r.ok:
                     h=r.json()
+                    if h.get("boot_failed"):
+                        raise RuntimeError("Backend bootstrap failed: "+str(h.get("boot_error") or h.get("boot_stage") or "unknown"))
                     if all(h.get(k) for k in ("ok","model_present","wan_present","cuda_ready","flash_attn_ready")):
                         return h
                     last=json.dumps(h)
@@ -121,7 +127,10 @@ def start_for_g(explicit_approval: bool=False, estimated_usd: float=0.0) -> dict
     hf_token=os.getenv("HF_TOKEN")
     if not api_token or not hf_token:
         raise RuntimeError("SARJAS_WORKER_TOKEN/SARJAS_API_TOKEN and HF_TOKEN must be set")
-    life=RunpodLifecycle(PodConfig(api_token=api_token,hf_token=hf_token,
+    volume_id=os.getenv("SARJAS_NETWORK_VOLUME_ID","").strip()
+    if not volume_id:
+        raise RuntimeError("SARJAS_NETWORK_VOLUME_ID must be set before paid G testing")
+    life=RunpodLifecycle(PodConfig(api_token=api_token,hf_token=hf_token,network_volume_id=volume_id,
         hf_model_repo=os.getenv("HF_MODEL_REPO","SarabBagyana/sarjas-wan-runtime")))
     pod_id=""
     try:
