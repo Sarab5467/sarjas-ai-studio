@@ -101,7 +101,7 @@ class RunpodLifecycle:
     def stop(self, pod_id: str) -> None: self._run("pod","stop",pod_id)
     def delete(self, pod_id: str) -> None: self._run("pod","delete",pod_id)
 
-    def wait_ready(self, pod_id: str, timeout: int = 600, poll: int = 8) -> dict:
+    def wait_ready(self, pod_id: str, timeout: int = 240, poll: int = 6) -> dict:
         url, end, last = self.endpoint(pod_id,self.cfg.port), time.time()+timeout, ""
         while time.time() < end:
             try:
@@ -114,6 +114,8 @@ class RunpodLifecycle:
                         return h
                     last=json.dumps(h)
                 else: last=f"HTTP {r.status_code}"
+            except RuntimeError:
+                raise
             except Exception as e: last=str(e)
             time.sleep(poll)
         raise TimeoutError("Backend did not become ready: "+_redact(last))
