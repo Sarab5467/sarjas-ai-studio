@@ -13,6 +13,7 @@ OUT=ROOT/"outputs"; STATE=ROOT/"state"; DB=STATE/"jobs.sqlite3"
 API_TOKEN=os.getenv("SARJAS_API_TOKEN","")
 MODE=os.getenv("SARJAS_MODE","serverless").lower()
 LOCK=threading.Lock()
+BOOT=STATE/"boot.json"
 
 def ensure_dirs():
     OUT.mkdir(parents=True,exist_ok=True); STATE.mkdir(parents=True,exist_ok=True)
@@ -47,6 +48,11 @@ def db_get(jid):
     return x
 
 def health():
+    boot={}
+    try:
+        if BOOT.is_file(): boot=json.loads(BOOT.read_text(encoding="utf-8"))
+    except Exception:
+        boot={"stage":"UNKNOWN","failed":False}
     critical=[
       MODEL/"diffusion_pytorch_model.safetensors",
       MODEL/"models_t5_umt5-xxl-enc-bf16.pth",
@@ -72,7 +78,9 @@ def health():
       "storage_root":str(ROOT),"storage_mounted":ROOT.exists(),"db_path":str(DB),
       "model_path":str(MODEL),"model_present":model_present,
       "wan_repo":str(WAN_REPO),"wan_present":wan_present,
-      "cuda_ready":cuda_ready,"gpu_name":gpu_name,"flash_attn_ready":flash_ready}
+      "cuda_ready":cuda_ready,"gpu_name":gpu_name,"flash_attn_ready":flash_ready,
+      "boot_stage":boot.get("stage"),"boot_failed":bool(boot.get("failed",False)),
+      "boot_error":boot.get("error") if boot.get("failed") else None}
 
 def validate(p):
     action=str(p.get("action","health"))
